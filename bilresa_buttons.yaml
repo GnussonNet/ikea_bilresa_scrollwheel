@@ -8,7 +8,6 @@ blueprint:
   input:
     button_event:
       name: Button Event Entity
-      description: Matter event entity for the button
       selector:
         entity:
           domain: event
@@ -37,34 +36,23 @@ blueprint:
       selector:
         action: {}
 
-mode: restart
-max_exceeded: silent
+mode: single
 
 trigger:
   - platform: state
     entity_id: !input button_event
+    attribute: event_type
 
 action:
-  - variables:
-      event_type: "{{ state_attr(trigger.entity_id, 'event_type') }}"
-
   - choose:
-      # 1× press (delayed so it can be cancelled)
-      - conditions: "{{ event_type == 'multi_press_1' }}"
-        sequence:
-          - delay: "00:00:00.3"
-          - choose:
-              - conditions: "{{ state_attr(trigger.entity_id, 'event_type') == 'multi_press_1' }}"
-                sequence: !input action_single
+      - conditions: "{{ trigger.to_state.attributes.event_type == 'multi_press_1' }}"
+        sequence: !input action_single
 
-      # 2× press
-      - conditions: "{{ event_type == 'multi_press_2' }}"
+      - conditions: "{{ trigger.to_state.attributes.event_type == 'multi_press_2' }}"
         sequence: !input action_double
 
-      # 3× press
-      - conditions: "{{ event_type == 'multi_press_3' }}"
+      - conditions: "{{ trigger.to_state.attributes.event_type == 'multi_press_3' }}"
         sequence: !input action_triple
 
-      # Long press
-      - conditions: "{{ event_type == 'long_press' }}"
+      - conditions: "{{ trigger.to_state.attributes.event_type == 'long_press' }}"
         sequence: !input action_long
