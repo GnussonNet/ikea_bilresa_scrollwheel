@@ -54,29 +54,29 @@ trigger:
 
 action:
   - variables:
-      # Determine scroll direction
       is_right_scroll: "{{ trigger.id == 'right_scroll' }}"
-
       target_entity: !input target_media_player
 
-      # Right = +1, Left = -1
+      # Blueprint input values must be explicitly assigned
+      volume_step_right: !input volume_per_step_right
+      volume_step_left: !input volume_per_step_left
+
+      # Direction: Right = +1, Left = -1
       direction: "{{ 1 if is_right_scroll else -1 }}"
 
-      # Volume step in %
-      volume_step: >-
-        {{ (volume_per_step_right if is_right_scroll else volume_per_step_left) | default(5) | int }}
+      # Pick correct step size
+      volume_step: "{{ volume_step_right if is_right_scroll else volume_step_left }}"
 
-      # Number of scroll steps (fallback to 1 if missing or empty)
-      press_count: >-
-        {{ trigger.to_state.attributes.totalNumberOfPressesCounted | default(1) | int }}
+      # Scroll count (fallback to 1 if missing or empty)
+      press_count: "{{ trigger.to_state.attributes.totalNumberOfPressesCounted | default(1) | int }}"
 
-      # Current volume (0.0 – 1.0)
+      # Current volume (0.0–1.0)
       current_volume: "{{ state_attr(target_entity, 'volume_level') | float(0) }}"
 
-      # Volume change
-      volume_change: "{{ (volume_step * press_count * direction) / 100 }}"
+      # Volume change (as fraction)
+      volume_change: "{{ (volume_step | int * press_count * direction) / 100 }}"
 
-      # Clamp final volume
+      # Clamp new volume to 0.0–1.0
       new_volume: >-
         {% set v = current_volume + volume_change %}
         {% if v < 0 %}
