@@ -49,14 +49,22 @@ action:
       event_type: "{{ state_attr(trigger.entity_id, 'event_type') }}"
 
   - choose:
+      # 1× press (delayed so it can be cancelled)
       - conditions: "{{ event_type == 'multi_press_1' }}"
-        sequence: !input action_single
+        sequence:
+          - delay: "00:00:00.3"
+          - choose:
+              - conditions: "{{ state_attr(trigger.entity_id, 'event_type') == 'multi_press_1' }}"
+                sequence: !input action_single
 
+      # 2× press
       - conditions: "{{ event_type == 'multi_press_2' }}"
         sequence: !input action_double
 
+      # 3× press
       - conditions: "{{ event_type == 'multi_press_3' }}"
         sequence: !input action_triple
 
+      # Long press
       - conditions: "{{ event_type == 'long_press' }}"
         sequence: !input action_long
