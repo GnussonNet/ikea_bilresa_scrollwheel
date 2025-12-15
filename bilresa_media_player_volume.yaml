@@ -1,19 +1,19 @@
 blueprint:
   name: "IKEA Bilresa Scroll Wheel – Volume Control (Right & Left)"
-  description: "Universal Volume Control for IKEA Bilresa Scroll Wheel using current volume only"
+  description: "Control media player volume using IKEA Bilresa scroll wheel (right = up, left = down)"
   domain: automation
 
   input:
     scrollwheel_right_event_entity:
       name: "Scroll Wheel Event Entity – Right Rotation"
-      description: "Event Entity of the Scroll Wheel for right rotation"
+      description: "Event entity fired when rotating right"
       selector:
         entity:
           domain: event
 
     scrollwheel_left_event_entity:
       name: "Scroll Wheel Event Entity – Left Rotation"
-      description: "Event Entity of the Scroll Wheel for left rotation"
+      description: "Event entity fired when rotating left"
       selector:
         entity:
           domain: event
@@ -27,6 +27,7 @@ blueprint:
 
     volume_per_step_right:
       name: "Volume per Step – Right (%)"
+      description: "How much volume to increase per step"
       default: 5
       selector:
         number:
@@ -35,6 +36,7 @@ blueprint:
 
     volume_per_step_left:
       name: "Volume per Step – Left (%)"
+      description: "How much volume to decrease per step"
       default: 5
       selector:
         number:
@@ -52,25 +54,27 @@ trigger:
 
 action:
   - variables:
+      # Determine scroll direction
       is_right_scroll: "{{ trigger.id == 'right_scroll' }}"
+
       target_entity: !input target_media_player
 
-      # Direction: Right = +1, Left = -1
+      # Right = +1, Left = -1
       direction: "{{ 1 if is_right_scroll else -1 }}"
 
       # Volume step in %
       volume_step: >-
-        {{ volume_per_step_right if is_right_scroll else volume_per_step_left }}
+        {{ (volume_per_step_right if is_right_scroll else volume_per_step_left) | default(5) | int }}
 
-      # Extract press count
+      # Number of scroll steps (fallback to 1 if missing or empty)
       press_count: >-
-        {{ trigger.to_state.attributes.totalNumberOfPressesCounted | int(1) }}
+        {{ trigger.to_state.attributes.totalNumberOfPressesCounted | default(1) | int }}
 
       # Current volume (0.0 – 1.0)
       current_volume: "{{ state_attr(target_entity, 'volume_level') | float(0) }}"
 
-      # Calculate volume change
-      volume_change: "{{ (volume_step | int * press_count | int * direction) / 100 }}"
+      # Volume change
+      volume_change: "{{ (volume_step * press_count * direction) / 100 }}"
 
       # Clamp final volume
       new_volume: >-
