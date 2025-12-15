@@ -1,0 +1,62 @@
+blueprint:
+  name: IKEA BILRESA – Matter Button
+  description: >
+    IKEA BILRESA button via Matter over Thread.
+    Supports 1×, 2×, 3× and long press.
+  domain: automation
+
+  input:
+    button_event:
+      name: Button Event Entity
+      description: Matter event entity for the button
+      selector:
+        entity:
+          domain: event
+
+    action_single:
+      name: 1× Press Action
+      default: []
+      selector:
+        action: {}
+
+    action_double:
+      name: 2× Press Action
+      default: []
+      selector:
+        action: {}
+
+    action_triple:
+      name: 3× Press Action
+      default: []
+      selector:
+        action: {}
+
+    action_long:
+      name: Long Press Action
+      default: []
+      selector:
+        action: {}
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input button_event
+
+action:
+  - variables:
+      event_type: "{{ state_attr(trigger.entity_id, 'event_type') }}"
+
+  - choose:
+      - conditions: "{{ event_type == 'multi_press_1' }}"
+        sequence: !input action_single
+
+      - conditions: "{{ event_type == 'multi_press_2' }}"
+        sequence: !input action_double
+
+      - conditions: "{{ event_type == 'multi_press_3' }}"
+        sequence: !input action_triple
+
+      - conditions: "{{ event_type == 'long_press' }}"
+        sequence: !input action_long
