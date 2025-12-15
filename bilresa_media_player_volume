@@ -1,0 +1,149 @@
+blueprint:
+  name: "IKEA Bilresa Scroll Wheel – Volume Control (Right & Left)"
+  description: "Universal Volume Control for IKEA Bilresa Scroll Wheel with separate configurations for right and left rotation"
+  domain: automation
+
+  input:
+    scrollwheel_right_event_entity:
+      name: "Scroll Wheel Event Entity – Right Rotation"
+      selector:
+        entity:
+          domain: event
+
+    scrollwheel_left_event_entity:
+      name: "Scroll Wheel Event Entity – Left Rotation"
+      selector:
+        entity:
+          domain: event
+
+    target_media_player:
+      name: "Target Media Player"
+      selector:
+        entity:
+          domain: media_player
+
+    scroll_right_direction:
+      name: "Action on Right Rotation"
+      selector:
+        select:
+          options:
+            - label: "Increase volume"
+              value: "up"
+            - label: "Decrease volume"
+              value: "down"
+      default: "up"
+
+    scroll_left_direction:
+      name: "Action on Left Rotation"
+      selector:
+        select:
+          options:
+            - label: "Increase volume"
+              value: "up"
+            - label: "Decrease volume"
+              value: "down"
+      default: "down"
+
+    volume_per_step_right:
+      name: "Volume per Step – Right (%)"
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 20
+
+    volume_per_step_left:
+      name: "Volume per Step – Left (%)"
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 20
+
+    startup_volume_right:
+      name: "Startup Volume on Turn On – Right (%)"
+      default: 20
+      selector:
+        number:
+          min: 5
+          max: 50
+
+    startup_volume_left:
+      name: "Startup Volume on Turn On – Left (%)"
+      default: 20
+      selector:
+        number:
+          min: 5
+          max: 50
+
+trigger:
+  - platform: state
+    entity_id: !input scrollwheel_right_event_entity
+    id: right_scroll
+  - platform: state
+    entity_id: !input scrollwheel_left_event_entity
+    id: left_scroll
+
+action:
+  - variables:
+      is_right_scroll: "{{ trigger.id == 'right_scroll' }}"
+      target_entity: !input target_media_player
+
+      direction: >-
+        {% if is_right_scroll %}
+          {{ 1 if scroll_right_direction == 'up' else -1 }}
+        {% else %}
+          {{ 1 if scroll_left_direction == 'up' else -1 }}
+        {% endif %}
+
+      volume_step: "{{ (volume_per_step_right if is_right_scroll else volume_per_step_left) | int }}"
+      startup_volume: "{{ (startup_volume_right if is_right_scroll else startup_volume_left) | int }}"
+
+      press_count: "{{ trigger.to_state.attributes.totalNumberOfPressesCounted | int(1) }}"
+      volume_change_pct: "{{ volume_step * press_count * direction }}"
+
+      player_on: "{{ states(target_entity) not in ['off', 'unavailable', 'unknown'] }}"
+      current_volume: "{{ state_attr(target_entity, 'volume_level') | float(0) }}"
+
+      # Convert everything to 0.0–1.0 range
+      volume_change: "{{ volume_change_pct / 100 }}"
+      startup_volume_level: "{{ startup_volume / 100 }}"
+
+      new_volume: >-
+        {% set v = (current_volume + volume_change) %}
+        {% if v < 0 %}
+          0
+        {% elif v > 1 %}
+          1
+        {% else %}
+          {{ v }}
+        {% endif %}
+
+  - if:
+      - condition: template
+        value_template: "{{ player_on }}"
+    then:
+      # Media player ON → adjust volume
+      - service: media_player.volume_set
+        target:
+          entity_id: !input target_media_player
+        data:
+          volume_level: "{{ new_volume }}"
+    else:
+      # Media player OFF
+      - if:
+          - condition: template
+            value_template: "{{ direction > 0 }}"
+        then:
+          # Turn on and set startup volume
+          - service: media_player.turn_on
+            target:
+              entity_id: !input target_media_player
+          - service: media_player.volume_set
+            target:
+              entity_id: !input target_media_player
+            data:
+              volume_level: "{{ startup_volume_level }}"
+
+mode: queued
+max: 20
